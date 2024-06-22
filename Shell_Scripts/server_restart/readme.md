@@ -7,9 +7,13 @@
 🔍 Key Features:
 
 Server Detection: Identifies if the Tomcat server is running by checking the process ID (PID).
+
 Start Server: Initiates the Tomcat server if it’s not running.
+
 Stop and Restart Server: Stops the server if it’s running and restarts it after a 60-second interval to ensure a smooth transition.
+
 Wait Interval: During a restart, the script waits for 60 seconds after stopping the server to ensure it has fully shut down before starting it again.
+
 Error Handling: Improved error handling and logging to provide better feedback and ensure reliability.
 
 🔄 Usage: This script is highly customizable and can be adapted to manage other servers like WebSphere or IBM HTTP Server by modifying the PID detection logic.
