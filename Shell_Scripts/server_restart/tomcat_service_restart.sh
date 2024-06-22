@@ -1,3 +1,13 @@
+# -----------------------------------------------------------------------------------
+# File Name    : Automating_Tomcat_Service_Restart
+# Author       : Thrinatha Reddy
+# Description  : Ensuring that the Tomcat server is always running and can be restarted smoothly during deployments.
+# Call Syntax  : ./tomcat_service_restart.sh
+# Last Modified: 22-JUN-2024
+# -----------------------------------------------------------------------------------
+
+
+
 #!/bin/bash
 
 # Configuration
