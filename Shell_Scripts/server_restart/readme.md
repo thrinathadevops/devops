@@ -1,4 +1,5 @@
-Automate Your Tomcat Server Management with This Shell Script
+🚀 Automate Your Tomcat Server Management with This Shell Script 🚀
+
 🔧 Problem: Ensuring that your Tomcat server is always running and can be restarted smoothly during deployments.
 
 🚀 Solution: Implement a bash script to manage the Tomcat server efficiently. This script checks if Tomcat is running, starts it if it’s stopped, or restarts it if it’s running.
