@@ -1,0 +1,114 @@
+---
+- name: Download Maven Package from GitHub Packages 
+  hosts: localhost
+  become: true
+  gather_facts: false
+  vars:
+    bearer_token: secrets.GITHP_TOKEN
+    repository_name: hprofile
+    repository_owner: ythrinathareddy
+  tasks:
+    - name: Retrieve packages for repository
+      shell: |
+            curl -L -O \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer {{ bearer_token }}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            https://maven.pkg.github.com/ythrinathareddy/hprofile/com/com.mycompany.app/vprofile/Latest/vprofile-0.1.2.war
+
+- name: deploy to tomcat
+  hosts: 192.168.165.10
+  become: true
+  gather_facts: false  
+
+  vars:
+    tomcat_bin_dir: "/opt/tomcat/apache-tomcat-9.0.85/bin"
+    tomcat_webapps_dir: "/opt/tomcat/apache-tomcat-9.0.85/webapps"
+    war_file_path: "/home/ansible/plays"
+    tomcat_version: "9.0.62"
+    tomcat_home: "/opt/tomcat"
+    java_home: "/usr/lib/jvm/"
+  tasks:
+    - name: Ping to test connectivity
+      ping:
+    
+    - name: Check if Tomcat service is running
+      ansible.builtin.systemd:
+        name: tomcat
+        state: started
+      register: tomcat_status
+      ignore_errors: true
+
+    - name: Create Tomcat Directory
+      ansible.builtin.file:
+        path: "{{ tomcat_home }}"
+        state: directory
+      when: tomcat_status.status == "inactive"
+
+    - name: Download Tomcat
+      ansible.builtin.get_url:
+        url: https://dlcdn.apache.org/tomcat/tomcat-9/v9.0.85/bin/apache-tomcat-9.0.85.tar.gz
+        dest: /tmp/apache-tomcat-9.0.85.tar.gz
+      when: tomcat_status.status == "inactive"
+
+    - name: Extract Tomcat
+      ansible.builtin.unarchive:
+        src: /tmp/apache-tomcat-9.0.85.tar.gz
+        dest: "{{ tomcat_home }}"
+        remote_src: yes
+      when: tomcat_status.status == "inactive"
+
+    - name: Create Tomcat systemd service file
+      copy:
+        dest: /etc/systemd/system/tomcat.service
+        content: |
+          [Unit]
+          Description=Apache Tomcat Web Application Container
+          After=network.target
+
+          [Service]
+          Type=forking
+
+          Environment=CATALINA_PID={{ tomcat_home }}/apache-tomcat-9.0.85/temp/tomcat.pid
+          Environment=CATALINA_HOME={{ tomcat_home }}/apache-tomcat-9.0.85
+          Environment=CATALINA_BASE={{ tomcat_home }}/apache-tomcat-9.0.85
+          Environment='CATALINA_OPTS=-Xms512M -Xmx1024M -server -XX:+UseParallelGC'
+          Environment='JAVA_OPTS=-Djava.awt.headless=true -Djava.security.egd=file:/dev/./urandom'
+
+          ExecStart="{{ tomcat_home }}/apache-tomcat-9.0.85/bin/startup.sh"
+          ExecStop="{{ tomcat_home }}/apache-tomcat-9.0.85/bin/shutdown.sh"
+
+          owner=root
+          Group=root
+          mode=0777
+
+          RestartSec=10
+          Restart=always
+
+          [Install]
+          WantedBy=multi-user.target
+      notify:
+        - Reload systemd
+        - Restart tomcat 
+      when: tomcat_status.status == "inactive"    
+
+    - name: copy war file to tomcat webapps directory
+      copy:
+        src: "{{ war_file_path }}"
+        dest: "{{ tomcat_webapps_dir }}"
+    
+    - name: Stop Tomcat if it's running
+      ansible.builtin.systemd:
+        name: tomcat
+        state: stopped
+      when: tomcat_status.status == "running"
+  handlers:
+    - name: Reload systemd
+      systemd:
+        daemon_reload: yes
+
+    - name: Restart tomcat
+      systemd:
+        name: tomcat
+        state: restarted
+
