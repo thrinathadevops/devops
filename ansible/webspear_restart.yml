@@ -1,0 +1,33 @@
+---
+- name: Stop and start WebSphere server
+  hosts: hostname
+  gather_facts: no
+  tasks:
+    - name: Stop WebSphere server
+      become: yes
+      become_user: wsadmin
+      shell: |
+        cd /opt/IBM/WebSphere/AppServer/profiles/IBMB01/bin
+        ./stopServer IBMBServer01
+      register: stop_output
+      ignore_errors: yes
+
+    - name: Display stop server output
+      debug:
+        msg: "{{ stop_output.stdout }}"
+
+    - name: Start WebSphere server
+      become: yes
+      become_user: wsadmin
+      shell: |
+        cd /opt/IBM/WebSphere/AppServer/profiles/IBMB01/bin
+        ./startServer IBMBServer01
+      when: stop_output.rc == 0
+      register: start_output
+
+    - name: Display start server output
+      debug:
+        msg: "{{ start_output.stdout }}"
+      when: stop_output.rc == 0
+
+
