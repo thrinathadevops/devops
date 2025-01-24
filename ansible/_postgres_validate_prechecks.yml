@@ -1,0 +1,140 @@
+- name: Pre-Upgrade System Compatibility Validation
+  hosts: 192.168.165.10  # Target PostgreSQL host
+  become: true
+  gather_facts: true
+
+  vars:
+    postgres_dependencies:
+      - gcc
+      - make
+      - zlib-devel
+      - wget
+      - libicu-devel
+      - bison
+      - flex
+      - perl
+      - readline-devel
+      - openssl-devel
+      - libxml2-devel
+      - libxslt-devel
+      - krb5-devel
+      - pam-devel
+      - python3-devel
+      - tcl-devel
+      - llvm
+      - clang
+      - systemd-devel
+
+  tasks:
+    # Ensure logs directory exists
+    - name: Ensure logs directory exists
+      ansible.builtin.file:
+        path: /home/ansible/ansible-postgres-upgrade/roles/logs
+        state: directory
+        mode: '0755'
+      delegate_to: localhost
+
+    # Create or clean the prechecks log file
+    - name: Create or clean the prechecks log file
+      ansible.builtin.file:
+        path: /home/ansible/ansible-postgres-upgrade/roles/logs/prechecks.log
+        state: touch
+        mode: '0644'
+      delegate_to: localhost
+
+    # Gather OS details
+    - name: Gather OS details
+      ansible.builtin.shell: cat /etc/os-release
+      register: os_details
+      changed_when: false
+
+    - name: Log OS details to prechecks log
+      ansible.builtin.blockinfile:
+        path: /home/ansible/ansible-postgres-upgrade/roles/logs/prechecks.log
+        block: |
+          ========== OS Details ==========
+          {{ os_details.stdout }}
+          ================================
+        marker: "# {mark} ANSIBLE MANAGED BLOCK: OS Details"
+      delegate_to: localhost
+
+    # Log system architecture details
+    - name: Log system architecture details
+      ansible.builtin.lineinfile:
+        path: /home/ansible/ansible-postgres-upgrade/roles/logs/prechecks.log
+        line: "System Architecture: {{ ansible_architecture }}"
+      delegate_to: localhost
+
+    # Gather system disk space details
+    - name: Gather system disk space details
+      ansible.builtin.shell: df -h
+      register: disk_usage
+      changed_when: false
+
+    - name: Log disk space details to prechecks log
+      ansible.builtin.blockinfile:
+        path: /home/ansible/ansible-postgres-upgrade/roles/logs/prechecks.log
+        block: |
+          ========== Disk Usage ==========
+          {{ disk_usage.stdout }}
+          ================================
+        marker: "# {mark} ANSIBLE MANAGED BLOCK: Disk Usage"
+      delegate_to: localhost
+
+    # Gather memory usage details
+    - name: Gather memory usage details
+      ansible.builtin.shell: free -h
+      register: memory_usage
+      changed_when: false
+
+    - name: Log memory usage details to prechecks log
+      ansible.builtin.blockinfile:
+        path: /home/ansible/ansible-postgres-upgrade/roles/logs/prechecks.log
+        block: |
+          ========== Memory Usage ==========
+          {{ memory_usage.stdout }}
+          ================================
+        marker: "# {mark} ANSIBLE MANAGED BLOCK: Memory Usage"
+      delegate_to: localhost
+
+    # Check PostgreSQL dependencies presence
+    - name: Check PostgreSQL dependencies presence
+      ansible.builtin.shell: rpm -q {{ item }}
+      register: dependency_check_results
+      failed_when: false
+      changed_when: false
+      loop: "{{ postgres_dependencies }}"
+
+    # Log dependency check results to prechecks log
+    - name: Log dependency check results to prechecks log
+      ansible.builtin.lineinfile:
+        path: /home/ansible/ansible-postgres-upgrade/roles/logs/prechecks.log
+        line: "{{ item.item }}: {{ 'Installed' if 'is not installed' not in item.stdout else 'Not Installed' }}"
+      loop: "{{ dependency_check_results.results }}"
+      delegate_to: localhost
+
+    # Identify and log missing dependencies
+    - name: Identify missing dependencies and log them
+      ansible.builtin.lineinfile:
+        path: /home/ansible/ansible-postgres-upgrade/roles/logs/prechecks.log
+        line: "Missing Dependency: {{ item.item }} is required for upgrade."
+      when: "'is not installed' in item.stdout"
+      loop: "{{ dependency_check_results.results }}"
+      delegate_to: localhost
+
+    # Ensure all PostgreSQL dependencies are installed (without failure)
+    - name: Ensure all PostgreSQL dependencies are installed
+      ansible.builtin.assert:
+        that:
+          - dependency_check_results.results | map(attribute='stdout') | select('search', 'is not installed') | list | length == 0
+        fail_msg: >
+          Some PostgreSQL dependencies are missing. Refer to `roles/logs/prechecks.log`
+          file for details.
+        success_msg: >
+          All PostgreSQL dependencies are installed and system is ready for upgrade.
+      ignore_errors: true  # Allows playbook to continue even if dependencies are missing
+
+    # Summary message after checks
+    - name: Final message on dependency check completion
+      ansible.builtin.debug:
+        msg: "Precheck validation completed. Please review 'roles/logs/prechecks.log' for missing dependencies."
