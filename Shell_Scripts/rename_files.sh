@@ -1,8 +1,8 @@
 for file in $(ls images)
-do      
+do
         if [[ $file = *.jpeg ]]
                 then
-                new_nmae=#(echo $file| sed '/home/bob/images')
+                new_name=$(echo $file| sed 's/jpeg/jpg/g')
                 mv images/$file images/$new_name
-        fi      
+        fi
 done
